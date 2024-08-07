@@ -3,11 +3,14 @@ import numpy as np
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 # Step 1: Read the Data
 file_path = 'NEW.xlsx'  # Replace with your file path
-data = pd.read_excel(file_path)
+try:
+    data = pd.read_excel(file_path)
+except FileNotFoundError:
+    print(f"Error: File '{file_path}' not found. Please check the file path.")
+    exit()
 
 # Remove rows with missing values
 data = data.dropna()
@@ -19,7 +22,7 @@ resp_rate = ctrl.Antecedent(np.arange(5, 35, 1), 'resp_rate')
 o2_sats = ctrl.Antecedent(np.arange(70, 105, 1), 'o2_sats')
 temperature = ctrl.Antecedent(np.arange(30, 42, 0.1), 'temperature')
 
-# Define membership functions with adjusted ranges
+# Define membership functions
 heart_rate['low'] = fuzz.trimf(heart_rate.universe, [40, 60, 80])
 heart_rate['normal'] = fuzz.trimf(heart_rate.universe, [80, 100, 120])
 heart_rate['high'] = fuzz.trimf(heart_rate.universe, [120, 140, 160])
@@ -46,14 +49,6 @@ event['unlikely'] = fuzz.trimf(event.universe, [0, 0, 0.5])
 event['possible'] = fuzz.trimf(event.universe, [0.25, 0.5, 0.75])
 event['likely'] = fuzz.trimf(event.universe, [0.5, 1, 1])
 
-# Visualize the membership functions
-heart_rate.view()
-systolic_bp.view()
-resp_rate.view()
-o2_sats.view()
-temperature.view()
-event.view()
-
 # Step 3: Define Fuzzy Rules
 rule1 = ctrl.Rule(heart_rate['high'] & systolic_bp['high'] & resp_rate['high'] & o2_sats['low'] & temperature['high'], event['likely'])
 rule2 = ctrl.Rule(heart_rate['low'] & systolic_bp['low'] & resp_rate['low'] & o2_sats['high'] & temperature['low'], event['unlikely'])
@@ -71,12 +66,12 @@ results = []
 
 for index, row in data.iterrows():
     try:
-        # Validate inputs to ensure they are within expected ranges
-        hr = max(min(row['HEART_RATE'], 159), 39)
-        sbp = max(min(row['SYSTOLIC_BP'], 199), 69)
-        rr = max(min(row['RESP_RATE'], 34), 4)
-        o2 = max(min(row['O2_SATS'], 104), 69)
-        temp = max(min(row['TEMPERATURE'], 41.9), 29.9)
+        # Validate inputs
+        hr = np.clip(row['HEART_RATE'], 40, 159)
+        sbp = np.clip(row['SYSTOLIC_BP'], 70, 199)
+        rr = np.clip(row['RESP_RATE'], 5, 34)
+        o2 = np.clip(row['O2_SATS'], 70, 104)
+        temp = np.clip(row['TEMPERATURE'], 30, 41.9)
         
         event_simulation.input['heart_rate'] = hr
         event_simulation.input['systolic_bp'] = sbp
@@ -87,39 +82,19 @@ for index, row in data.iterrows():
         event_simulation.compute()
         results.append(event_simulation.output['event'])
     except Exception as e:
-        print(f"Error with inputs {hr}, {sbp}, {rr}, {o2}, {temp}: {e}")
-        results.append(np.nan)  # Handle error case by appending NaN
+        print(f"Error processing row {index}: {e}")
+        results.append(np.nan)
 
 data['Predicted_Event'] = results
 
 # Display the results
 print(data)
 
-# Optional: Visualize the Results
-X, Y = np.meshgrid(np.arange(40, 160, 1), np.arange(70, 200, 1))
-Z = np.zeros_like(X)
-
-for i in range(X.shape[0]):
-    for j in range(X.shape[1]):
-        try:
-            event_simulation.input['heart_rate'] = X[i, j]
-            event_simulation.input['systolic_bp'] = Y[i, j]
-            event_simulation.input['resp_rate'] = 19  # Use a default or average value
-            event_simulation.input['o2_sats'] = 95    # Use a default or average value
-            event_simulation.input['temperature'] = 36.5  # Use a default or average value
-            
-            event_simulation.compute()
-            Z[i, j] = event_simulation.output['event']
-        except Exception as e:
-            print(f"Error with inputs {X[i, j]}, {Y[i, j]}, 19, 95, 36.5: {e}")
-            Z[i, j] = np.nan  # Handle error case by assigning NaN
-
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.plot_surface(X, Y, Z, cmap='viridis')
-
-ax.set_xlabel('Heart Rate')
-ax.set_ylabel('Systolic BP')
-ax.set_zlabel('Event Likelihood')
-
+# Visualization
+plt.figure(figsize=(10, 6))
+plt.scatter(data['HEART_RATE'], data['SYSTOLIC_BP'], c=data['Predicted_Event'], cmap='viridis')
+plt.colorbar(label='Event Likelihood')
+plt.xlabel('Heart Rate')
+plt.ylabel('Systolic BP')
+plt.title('Event Likelihood based on Heart Rate and Systolic BP')
 plt.show()
