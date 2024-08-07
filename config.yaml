@@ -1,0 +1,3 @@
+input_file: 'NEW.xlsx'
+membership_boundaries_file: 'membership_boundaries.json'
+output_file: 'risk_assessment_results.csv'
