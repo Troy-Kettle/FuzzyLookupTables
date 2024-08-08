@@ -103,12 +103,6 @@ def process_row(row, event_simulation):
         logging.warning(f"Error processing row: {e}")
         return 0.5  # Assign medium risk for errors
 
-def perform_fuzzy_inference(data, event_ctrl):
-    """Perform fuzzy inference on the data."""
-    event_simulation = ctrl.ControlSystemSimulation(event_ctrl)
-    tqdm.pandas(desc="Processing data")
-    data['Predicted_Event'] = data.progress_apply(lambda row: process_row(row, event_simulation), axis=1)
-    return data
 
 def categorize_risk(value):
     """
